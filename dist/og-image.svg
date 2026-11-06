@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" shape-rendering="crispEdges">
+  <rect width="1200" height="630" fill="#0F1020"/>
+  <g fill="#F6E7C1" opacity="0.6">
+    <rect x="80" y="70" width="6" height="6"/><rect x="260" y="520" width="6" height="6"/><rect x="1080" y="90" width="6" height="6"/>
+    <rect x="980" y="540" width="6" height="6"/><rect x="560" y="40" width="6" height="6"/><rect x="1130" y="330" width="6" height="6"/>
+  </g>
+  <rect x="300" y="60" width="600" height="510" rx="40" fill="#1A1A20" stroke="#F2C14E" stroke-width="8"/>
+  <text x="600" y="150" text-anchor="middle" font-family="'Press Start 2P', monospace" font-size="48" fill="#F2C14E">WHEEL RADIO</text>
+  <g transform="translate(600 360)">
+    <circle r="150" fill="none" stroke="#F2C14E" stroke-width="16"/>
+    <circle r="128" fill="none" stroke="#8A5A1C" stroke-width="6" stroke-dasharray="8 22"/>
+    <g stroke="#6B5A3A" stroke-width="6">
+      <line x1="-120" y1="0" x2="120" y2="0"/><line x1="-60" y1="-104" x2="60" y2="104"/><line x1="60" y1="-104" x2="-60" y2="104"/>
+    </g>
+    <circle r="62" fill="#F2C14E"/>
+    <path d="M-16 -32h12v64h-12zM-4 -24h12v48h-12zM8 -16h12v32h-12zM20 -8h10v16h-10z" fill="#0F1020"/>
+  </g>
+  <g transform="translate(560 452) scale(6)">
+    <path fill="#7A3E12" d="M8 0h2v1H8zM5 1h3v1H5zM3 2h2v1H3zM2 3h1v1H2zM1 4h1v1H1zM0 5h1v1H0zM1 6h1v1H1zM2 7h10v1H2z"/>
+    <path fill="#FF9F43" d="M8 1h2v1H8zM5 2h6v1H5zM3 3h7v1H3zM2 4h10v1H2zM1 5h5v1H1zM2 6h3v1H2z"/>
+    <path fill="#F6E7C1" d="M6 5h4v1H6zM5 6h6v1H5z"/>
+    <path fill="#0F1020" d="M10 3h1v1h-1z"/>
+  </g>
+</svg>

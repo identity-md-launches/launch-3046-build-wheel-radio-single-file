@@ -1,0 +1,6 @@
+# Path budget: this file only keeps tool caches out of Git (a few bytes).
+node_modules/
+.npm/
+.cache/
+test/scratch/
+*.tgz

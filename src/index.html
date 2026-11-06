@@ -1,0 +1,1215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wheel Radio · live music from Squeektoshi's wheel</title>
+<meta name="description" content="Wheel Radio plays live generative lofi driven by Squeektoshi the hamster's real wheel on Squeekchain. Read-only, no wallet, runs in your browser.">
+<meta name="theme-color" content="#0F1020">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Wheel Radio">
+<meta property="og:description" content="Live generative music driven by Squeektoshi the hamster's wheel on Squeekchain.">
+<meta property="og:image" content="./og-image.svg">
+<meta property="og:image:alt" content="A pixel-art radio with a gold hamster wheel and the words Wheel Radio">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' rx='3' fill='%230F1020'/%3E%3Cpath fill='%23F2C14E' d='M5 1h6v2H5zM3 3h2v2H3zM11 3h2v2h-2zM1 5h2v6H1zM13 5h2v6h-2zM3 11h2v2H3zM11 11h2v2h-2zM5 13h6v2H5z'/%3E%3Cpath fill='%23FF9F43' d='M7 4h2v8H7zM4 7h8v2H4z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;family=VT323&amp;display=swap">
+<style>
+/* ---------- Tokens ---------- */
+:root {
+  --navy: #0F1020;
+  --ink: #1A1A20;
+  --gold: #F2C14E;
+  --amber: #FF9F43;
+  --cream: #F6E7C1;
+  --teal: #4ECDC4;
+  --muted: #C9BC9A;          /* secondary text on --ink */
+  --line: #3A3550;           /* hairlines and inner borders */
+  --screen: #130F09;         /* LCD glass */
+  --screen-line: #4A3516;
+  --focus: #F6E7C1;
+
+  /* State-driven accents: warm while running, cool while sleeping */
+  --accent: var(--gold);
+  --accent-2: var(--amber);
+  --glow: rgba(242, 193, 78, 0.55);
+  --sky: #0F1020;
+
+  --font-display: "Press Start 2P", ui-monospace, monospace;
+  --font-num: "VT323", ui-monospace, monospace;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* One type scale, four sizes */
+  --fs-xs: 0.75rem;   /* 12px: section titles, captions */
+  --fs-sm: 0.875rem;  /* 14px: body, buttons */
+  --fs-md: 1.25rem;   /* 20px: brand, LCD and readouts */
+  --fs-lg: 1.5rem;    /* 24px: stat numbers */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-card: 16px;
+  --radius-px: 4px;
+  --t: 300ms ease;
+  color-scheme: dark;
+}
+body.is-sleeping {
+  --accent: var(--teal);
+  --accent-2: #7FB8F0;
+  --glow: rgba(78, 205, 196, 0.5);
+  --sky: #0A0E22;
+}
+
+/* ---------- Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: var(--space-4) var(--space-3) var(--space-6);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--cream);
+  background-color: var(--sky);
+  /* subtle dotted grid */
+  background-image: radial-gradient(rgba(246, 231, 193, 0.07) 1px, transparent 1.5px);
+  background-size: 16px 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--t);
+}
+h1, h2, p, dl, dd { margin: 0; }
+button { font: inherit; color: inherit; }
+a { color: var(--accent); text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.sr-only {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---------- Twinkling stars (decorative) ---------- */
+.sky { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.sky i {
+  position: absolute; width: 2px; height: 2px; background: var(--cream); opacity: 0.5;
+}
+.sky i:nth-child(3n) { width: 3px; height: 3px; background: var(--gold); }
+@media (prefers-reduced-motion: no-preference) {
+  .sky i { animation: twinkle 4s steps(4) infinite; }
+  .sky i:nth-child(2n) { animation-duration: 6s; animation-delay: -2s; }
+  .sky i:nth-child(5n) { animation-duration: 9s; animation-delay: -5s; }
+}
+@keyframes twinkle { 50% { opacity: 0.1; } }
+
+/* ---------- Radio body ---------- */
+.radio {
+  position: relative; z-index: 1;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-5);
+  background-color: var(--ink);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-card);
+  display: grid;
+  gap: var(--space-5);
+  transition: border-color var(--t);
+}
+@media (min-width: 400px) { .radio { padding-inline: var(--space-5); } }
+
+/* 1. Header and tuning dial */
+.top { display: grid; gap: var(--space-2); text-align: center; }
+.brand {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--gold);
+  text-shadow: 0 0 8px var(--glow), 0 0 2px var(--gold);
+  transition: text-shadow var(--t);
+}
+.tagline { color: var(--muted); }
+.dial {
+  position: relative;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-3) 0;
+  background-color: #0B0C18;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-px);
+}
+.dial-ticks {
+  height: 12px;
+  background-image: repeating-linear-gradient(90deg, var(--muted) 0 2px, transparent 2px 12px);
+  opacity: 0.6;
+}
+.dial-scale {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-num); font-size: var(--fs-md); line-height: 1.2; color: var(--muted);
+}
+.dial-scale .station { color: var(--accent); transition: color var(--t); }
+.needle {
+  position: absolute; top: 0; bottom: 0; left: 4%;
+  width: 3px; margin-left: -1px;
+  background: var(--amber);
+  box-shadow: 0 0 6px var(--amber);
+}
+@media (prefers-reduced-motion: no-preference) { .needle { transition: left 800ms ease-out; } }
+
+/* 2. Status */
+.status { display: grid; justify-items: center; gap: var(--space-2); }
+.pill {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 6px var(--space-3);
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  text-align: center;
+  line-height: 1.3;
+}
+.dot {
+  flex: none; width: 10px; height: 10px; border-radius: 2px;
+  background: var(--muted);
+}
+.is-running .dot { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+.is-sleeping .dot { background: var(--teal); box-shadow: 0 0 8px var(--teal); }
+.meta { display: flex; align-items: center; gap: var(--space-3); }
+.bpm { font-family: var(--font-num); font-size: var(--fs-md); line-height: 1; color: var(--cream); font-variant-numeric: tabular-nums; }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px var(--space-2);
+  border: 2px solid currentColor;
+  border-radius: var(--radius-px);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  color: var(--teal);
+}
+.badge::before { content: ""; width: 6px; height: 6px; background: currentColor; }
+.badge[data-state="stale"], .badge[data-state="reconnecting"] { color: var(--amber); }
+.badge[data-state="demo"], .badge[data-state="connecting"] { color: var(--muted); }
+.badge[data-state="reconnecting"]::before, .badge[data-state="connecting"]::before { background: transparent; border: 1px solid currentColor; }
+
+/* 3. Wheel stage with play button */
+.stage-wrap { display: grid; justify-items: center; gap: var(--space-3); }
+.stage { position: relative; width: min(264px, 100%); aspect-ratio: 1; }
+.wheel { position: absolute; inset: 0; width: 100%; height: 100%; will-change: transform; }
+.wheel .rim { fill: var(--accent); transition: fill var(--t); }
+.wheel .rim2 { fill: #8A5A1C; }
+.is-sleeping .wheel .rim2 { fill: #2D5F6B; }
+.wheel .rung { fill: var(--cream); opacity: 0.85; }
+.wheel .spoke { fill: #6B5A3A; }
+.play {
+  position: absolute; left: 50%; top: 50%;
+  width: 38%; aspect-ratio: 1; min-width: 88px;
+  transform: translate(-50%, -50%);
+  display: grid; place-items: center;
+  border: 0; border-radius: 50%;
+  background: var(--gold);
+  color: var(--navy);
+  cursor: pointer;
+  box-shadow: 0 0 0 6px rgba(15, 16, 32, 0.9), 0 0 28px var(--glow), inset -6px -6px 0 rgba(122, 62, 18, 0.35), inset 6px 6px 0 rgba(255, 255, 255, 0.25);
+  transition: background-color var(--t), box-shadow var(--t);
+}
+.play svg { width: 44%; height: 44%; }
+@media (hover: hover) { .play:hover { background: #F7D06C; } }
+.play:active { transform: translate(-50%, -48%); }
+.play:focus-visible { outline: 3px solid var(--focus); outline-offset: 8px; }
+.hamster {
+  position: absolute; left: 50%; bottom: 9%;
+  width: 24%; transform: translateX(-50%);
+  image-rendering: pixelated; pointer-events: none;
+}
+.moon {
+  position: absolute; top: 2%; right: 2%;
+  width: 34px; height: 34px; border-radius: 50%;
+  box-shadow: 9px -6px 0 0 var(--cream);
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--t);
+}
+.zzz {
+  position: absolute; right: 13%; bottom: 30%;
+  font-family: var(--font-display); font-size: var(--fs-xs); line-height: 1.6; color: var(--teal);
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--t);
+}
+.is-sleeping .moon, .is-sleeping .zzz { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .is-sleeping .zzz { animation: drift 3s steps(3) infinite; }
+}
+@keyframes drift { 50% { transform: translateY(-6px); } }
+.hint { max-width: 32ch; text-align: center; color: var(--muted); text-wrap: balance; }
+
+/* 4. Speaker grille visualizer */
+.grille {
+  padding: var(--space-2);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-px);
+  background-color: #111119;
+  background-image: radial-gradient(#26243A 1.5px, transparent 2px);
+  background-size: 8px 8px;
+}
+.grille canvas { display: block; width: 100%; height: 96px; }
+
+/* Shared section title */
+.section { display: grid; gap: var(--space-3); }
+.title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--accent);
+  transition: color var(--t);
+}
+
+/* 5. LCD now playing */
+.lcd {
+  display: grid; gap: var(--space-1);
+  padding: var(--space-3);
+  background-color: var(--screen);
+  border: 2px solid var(--screen-line);
+  border-radius: var(--radius-px);
+  font-family: var(--font-num);
+  font-size: var(--fs-md);
+  line-height: 1.15;
+  color: var(--amber);
+  text-shadow: 0 0 6px rgba(255, 159, 67, 0.45);
+  font-variant-numeric: tabular-nums;
+}
+.lcd .k { color: #C98A4A; }
+.lcd-row { display: flex; justify-content: space-between; gap: var(--space-3); }
+.track { overflow-wrap: anywhere; }
+.bar {
+  height: 10px; margin-top: var(--space-1);
+  border: 2px solid var(--screen-line);
+  background: #0B0905;
+}
+.bar > span {
+  display: block; height: 100%; width: 0%;
+  background-image: repeating-linear-gradient(90deg, var(--amber) 0 6px, transparent 6px 8px);
+}
+
+/* 6. Stats */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); text-align: center; }
+.stat { display: flex; flex-direction: column-reverse; gap: 2px; min-width: 0; }
+.stat dd {
+  font-family: var(--font-num); font-size: var(--fs-lg); line-height: 1.1;
+  color: var(--cream); font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.stat dt { font-size: var(--fs-xs); color: var(--muted); }
+
+/* 7. Controls */
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.volume { display: flex; align-items: center; gap: var(--space-3); flex: 1 1 180px; }
+.volume label { color: var(--muted); }
+.knob {
+  position: relative; flex: none; width: 40px; height: 40px; border-radius: 50%;
+  background: #2A2833;
+  box-shadow: inset 0 0 0 2px var(--line), inset -3px -3px 0 rgba(0, 0, 0, 0.35);
+  transform: rotate(calc(-135deg + var(--v, 0.8) * 270deg));
+}
+.knob::after {
+  content: ""; position: absolute; left: 50%; top: 5px; width: 4px; height: 12px; margin-left: -2px;
+  background: var(--accent); transition: background-color var(--t);
+}
+.volume input { flex: 1; min-width: 80px; height: 44px; margin: 0; accent-color: var(--gold); cursor: pointer; }
+.btn {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 44px; padding: 0 var(--space-4);
+  border: 2px solid var(--line); border-radius: var(--radius-px);
+  background: #22212B; color: var(--cream);
+  cursor: pointer;
+  transition: border-color var(--t), background-color var(--t);
+}
+@media (hover: hover) { .btn:hover { border-color: var(--accent); } }
+.led { width: 8px; height: 8px; border: 2px solid var(--muted); }
+.btn[aria-pressed="true"] { border-color: var(--teal); }
+.btn[aria-pressed="true"] .led { background: var(--teal); border-color: var(--teal); box-shadow: 0 0 6px var(--teal); }
+
+/* 8. Chart */
+.chart { display: block; width: 100%; height: 88px; }
+.chart .b { fill: var(--accent); opacity: 0.75; transition: fill var(--t); }
+.chart .b.now { fill: var(--amber); opacity: 1; }
+.chart .base { fill: var(--line); }
+.axis { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--muted); }
+.chart-note { color: var(--muted); }
+
+/* 9. Footer */
+.foot {
+  position: relative; z-index: 1;
+  max-width: 480px; margin: var(--space-4) auto 0;
+  display: grid; gap: var(--space-1); justify-items: center; text-align: center;
+  font-size: var(--fs-xs); color: var(--muted);
+}
+.foot a { display: inline-block; padding: var(--space-2) var(--space-2); }
+
+@media (max-width: 360px) {
+  body { padding-inline: var(--space-2); }
+  .radio { padding-inline: var(--space-3); gap: var(--space-4); }
+  .controls .btn { padding: 0 var(--space-3); }
+}
+@media (forced-colors: active) {
+  .play, .btn, .radio { border: 2px solid CanvasText; }
+}
+</style>
+</head>
+<body class="is-sleeping">
+<div class="sky" aria-hidden="true" id="sky"></div>
+
+<main class="radio" id="radio">
+  <!-- 1. Header and tuning dial -->
+  <header class="top">
+    <h1 class="brand">WHEEL RADIO</h1>
+    <p class="tagline">listen to the chain breathe</p>
+    <div class="dial" aria-hidden="true">
+      <div class="dial-ticks"></div>
+      <div class="dial-scale"><span>88</span><span class="station">FM 88.8</span><span>98</span><span>108</span></div>
+      <div class="needle" id="needle"></div>
+    </div>
+  </header>
+
+  <!-- Hidden live summary for screen readers -->
+  <h2 class="sr-only" id="summary">Connecting to Squeekchain</h2>
+  <p class="sr-only" role="status" id="announce"></p>
+
+  <!-- 2. Status -->
+  <section class="status" aria-label="Hamster status">
+    <p class="pill"><span class="dot" aria-hidden="true"></span><span id="statusText">Tuning in to Squeektoshi</span></p>
+    <div class="meta">
+      <span class="bpm" id="bpm">60 bpm</span>
+      <span class="badge" id="badge" data-state="connecting">connecting</span>
+    </div>
+  </section>
+
+  <!-- 3. Wheel with the main Play control -->
+  <section class="stage-wrap" aria-label="Player">
+    <div class="stage">
+      <svg class="wheel" id="wheel" viewBox="0 0 64 64" shape-rendering="crispEdges" aria-hidden="true">
+        <path class="spoke" id="wSpokes"/>
+        <path class="rim2" id="wRim2"/>
+        <path class="rung" id="wRungs"/>
+        <path class="rim" id="wRim"/>
+        <path class="rim" id="wHub"/>
+      </svg>
+      <svg class="hamster" id="hamster" viewBox="0 0 14 9" shape-rendering="crispEdges" aria-hidden="true"></svg>
+      <span class="moon" aria-hidden="true"></span>
+      <span class="zzz" aria-hidden="true">zzz</span>
+      <button class="play" id="play" type="button" aria-label="Play Wheel Radio">
+        <svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true"><path id="playIcon" fill="currentColor" d="M5 3h2v10H5zM7 4h2v8H7zM9 5h2v6H9zM11 6h2v4h-2zM13 7h1v2h-1z"/></svg>
+      </button>
+    </div>
+    <p class="hint" id="hint">Press play to tune in. The beat follows Squeektoshi's wheel live.</p>
+  </section>
+
+  <!-- 4. Speaker grille visualizer -->
+  <div class="grille" aria-hidden="true"><canvas id="viz" height="96"></canvas></div>
+
+  <!-- 5. Now playing LCD -->
+  <section class="section" aria-labelledby="npTitle">
+    <h2 class="title" id="npTitle">Now playing</h2>
+    <div class="lcd">
+      <p class="track" id="track">Block ... · Warming up</p>
+      <p class="lcd-row"><span class="k">Mood</span><span id="mood">Nap</span></p>
+      <p class="lcd-row"><span class="k">Chord</span><span id="chord">Am</span></p>
+      <p class="lcd-row"><span class="k">Song</span><span id="songPct">0%</span></p>
+      <div class="bar" role="progressbar" aria-label="Song progress, follows block progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="songBar"><span id="songFill"></span></div>
+    </div>
+  </section>
+
+  <!-- 6. Stats -->
+  <dl class="stats" aria-label="Wheel stats">
+    <div class="stat"><dt>total work</dt><dd id="statWork">0</dd></div>
+    <div class="stat"><dt>block height</dt><dd id="statBlock">0</dd></div>
+    <div class="stat"><dt>km run</dt><dd id="statKm">0.00</dd></div>
+  </dl>
+
+  <!-- 7. Controls -->
+  <section class="section" aria-labelledby="ctlTitle">
+    <h2 class="title" id="ctlTitle">Controls</h2>
+    <div class="controls">
+      <div class="volume">
+        <span class="knob" id="knob" aria-hidden="true"></span>
+        <label for="vol">Volume</label>
+        <input type="range" id="vol" min="0" max="100" step="1" value="80">
+      </div>
+      <button class="btn" id="mute" type="button">Mute</button>
+      <button class="btn" id="sleep" type="button" aria-pressed="false"><span class="led" aria-hidden="true"></span>Sleep mode</button>
+    </div>
+  </section>
+
+  <!-- 8. 24h chart -->
+  <section class="section" aria-labelledby="chartTitle">
+    <h2 class="title" id="chartTitle">Work, last 24 hours</h2>
+    <svg class="chart" id="chart" viewBox="0 0 240 88" preserveAspectRatio="none" role="img" aria-label="Loading 24 hour history"></svg>
+    <div class="axis" aria-hidden="true"><span>24 h ago</span><span>now</span></div>
+    <p class="chart-note" id="chartNote">Loading 24 h history</p>
+  </section>
+</main>
+
+<!-- 9. Footer -->
+<footer class="foot">
+  <a href="https://squeekchain.com" rel="noopener">squeekchain.com</a>
+  <p>Read-only · no wallet · near real-time · community project</p>
+</footer>
+
+<noscript><p style="text-align:center">Wheel Radio needs JavaScript to make music.</p></noscript>
+
+<script>
+"use strict";
+/* ================= Constants ================= */
+const RPM_DIVISOR = 1000;          // rpmMilli / RPM_DIVISOR = rpm
+const STORM_WORK = 100;            // work gained in last 10 min that triggers Storm
+const API_BASE = "https://api.squeekchain.com/v1";
+const STATUS_EVERY_MS = 5000;
+const SETTLE_EVERY_MS = 180000;
+const WORK_WINDOW_MS = 10 * 60 * 1000;
+const FETCH_TIMEOUT_MS = 8000;
+const LOOKAHEAD_S = 0.2;           // schedule this far ahead
+const TICK_MS = 25;                // scheduler interval
+
+/* ================= Helpers ================= */
+const $ = (id) => document.getElementById(id);
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const num = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
+const fmtInt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const NS = "http://www.w3.org/2000/svg";
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+// Seeded PRNG: same block height -> same song
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+// Accepts ISO strings, unix seconds or unix milliseconds
+function parseTime(v) {
+  if (v == null || v === "") return 0;
+  const n = Number(v);
+  if (Number.isFinite(n)) return n < 1e12 ? n * 1000 : n;
+  const t = Date.parse(String(v));
+  return Number.isFinite(t) ? t : 0;
+}
+
+/* ================= Music data ================= */
+const CHORDS = {
+  Am: [57, 60, 64], F: [53, 57, 60], C: [48, 52, 55], G: [55, 59, 62],
+  Dm: [50, 53, 57], Em: [52, 55, 59],
+  Am9: [57, 60, 64, 67, 71], Fmaj7: [53, 57, 60, 64],
+};
+const PROGS = [
+  ["Am", "F", "C", "G"],
+  ["Am", "Dm", "G", "C"],
+  ["F", "G", "Am", "Am"],
+  ["Am", "Em", "F", "Dm"],
+];
+const PENTA = [57, 60, 62, 64, 67, 69, 72, 74, 76, 79, 81]; // A minor pentatonic
+const ADJ = ["Night", "Velvet", "Midnight", "Golden", "Sleepy", "Amber", "Quiet", "Lunar", "Cozy", "Dusty", "Starlit", "Soft", "Little", "Late", "Warm", "Hazy"];
+const NOUN = ["Shift", "Sprint", "Orbit", "Pellets", "Burrow", "Lanterns", "Seeds", "Loop", "Static", "Tides", "Wheelhouse", "Dreams", "Signal", "Spin", "Whiskers", "Hay"];
+const MOODS = {
+  nap: { label: "Nap", density: 0 },
+  journey: { label: "Journey", density: 0.4 },
+  storm: { label: "Storm", density: 0.7 },
+};
+
+// Build a 4-bar "song" (64 sixteenths) for a block height
+function makeSong(height) {
+  const h = Math.max(0, Math.floor(height)) >>> 0;
+  const rnd = mulberry32(h || 1);
+  const prog = PROGS[h % 4];
+  const notes = [], rolls = [];
+  let idx = 5;
+  for (let i = 0; i < 64; i++) {
+    const chord = CHORDS[prog[Math.floor(i / 16)]];
+    idx = clamp(idx + Math.round((rnd() - 0.5) * 4), 2, PENTA.length - 1);
+    if (i % 4 === 0) { // strong beats lean on chord tones
+      const pcs = chord.map((c) => c % 12);
+      let best = -1;
+      PENTA.forEach((m, j) => { if (pcs.includes(m % 12) && (best < 0 || Math.abs(j - idx) < Math.abs(best - idx))) best = j; });
+      if (best >= 0) idx = best;
+    }
+    notes.push(PENTA[idx]);
+    rolls.push(rnd() * (i % 4 === 0 ? 0.7 : i % 2 === 0 ? 1 : 1.25));
+  }
+  const nameRnd = mulberry32((h * 2654435761) >>> 0);
+  const name = ADJ[Math.floor(nameRnd() * ADJ.length)] + " " + NOUN[Math.floor(nameRnd() * NOUN.length)];
+  return { height: h, prog, notes, rolls, name };
+}
+
+/* ================= State ================= */
+const S = {
+  hasData: false, demo: false, conn: "connecting",
+  spinning: false, rpm: 0, work: 0, distMm: 0, observedAt: 0, staleAfter: 120,
+  height: 0, progress: 0,
+  workLog: [], buckets: [], settleError: false,
+  sleepMode: false, muted: false, volume: 0.8, playing: false,
+  chord: "Am", song: makeSong(0),
+};
+const isStale = () => !S.demo && S.observedAt > 0 && Date.now() - S.observedAt > S.staleAfter * 1000;
+const isRunning = () => S.hasData && S.spinning && !isStale();
+const isAmbient = () => S.sleepMode || !isRunning();
+
+// Work gained over the last 10 minutes from our own samples,
+// topped up from the 24h buckets until we have 10 minutes of history.
+function workGained() {
+  const log = S.workLog;
+  if (!log.length) return 0;
+  const now = log[log.length - 1];
+  const base = log.find((e) => e.t >= now.t - WORK_WINDOW_MS) || log[0];
+  let gained = Math.max(0, now.w - base.w);
+  if (now.t - base.t < WORK_WINDOW_MS * 0.9 && S.buckets.length > 1) {
+    const spanMs = (24 * 3600 * 1000) / S.buckets.length;
+    const ref = S.buckets[S.buckets.length - 2].work;
+    gained = Math.max(gained, Math.round(ref * WORK_WINDOW_MS / spanMs));
+  }
+  return gained;
+}
+function moodKey() {
+  const g = workGained();
+  return g >= STORM_WORK ? "storm" : g >= 1 ? "journey" : "nap";
+}
+
+/* ================= Data ================= */
+async function getJSON(path) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const r = await fetch(API_BASE + path, { signal: ctl.signal, cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return await r.json();
+  } finally { clearTimeout(timer); }
+}
+
+// Map the API shape (numbers arrive as strings) to plain numbers
+function readStatus(j) {
+  const m = j?.measurement ?? {};
+  const pick = (k) => m?.[k] ?? j?.[k];
+  const proj = j?.builder?.projected;
+  const b = (proj?.blockHeight != null ? proj : j?.builder?.anchor) ?? {};
+  return {
+    spinning: String(pick("coreStatus") ?? "").toUpperCase() === "SPINNING",
+    rpm: Math.max(0, num(pick("rpmMilli")) / RPM_DIVISOR),
+    work: num(pick("cumulativeWorkUnits")),
+    distMm: num(pick("distanceMm")),
+    observedAt: parseTime(pick("observedAt")),
+    staleAfter: num(pick("staleAfterSeconds"), 120) || 120,
+    height: Math.max(0, Math.floor(num(b?.blockHeight))),
+    progress: clamp(num(b?.blockProgress) / 1e9, 0, 1),
+  };
+}
+
+function applyStatus(next, first) {
+  const prevWork = S.work, prevHeight = S.height;
+  Object.assign(S, next);
+  S.hasData = true;
+  const now = Date.now();
+  S.workLog.push({ t: now, w: next.work });
+  while (S.workLog.length && S.workLog[0].t < now - WORK_WINDOW_MS - 60000) S.workLog.shift();
+  if (!first && next.work > prevWork) Engine.clicks(Math.min(4, Math.ceil(next.work - prevWork)));
+  if (first || next.height !== prevHeight) {
+    S.song = makeSong(next.height);
+    if (!first) Engine.riser();
+  }
+}
+
+async function pollStatus() {
+  try {
+    const j = await getJSON("/status");
+    const first = !S.hasData || S.demo;
+    if (S.demo) { S.demo = false; S.workLog = []; S.buckets = []; pollSettlements(); }
+    applyStatus(readStatus(j), first);
+    S.conn = isStale() ? "stale" : "live";
+  } catch (err) {
+    if (!S.hasData || S.demo) demoTick();        // first load failed: labeled offline demo
+    else S.conn = "reconnecting";                 // keep last values, music keeps going
+  }
+  render();
+  setTimeout(pollStatus, STATUS_EVERY_MS);
+}
+
+async function pollSettlements() {
+  try {
+    const j = await getJSON("/settlements?range=24h");
+    const list = Array.isArray(j?.buckets) ? j.buckets : [];
+    S.buckets = list.map((b, i) => ({ work: Math.max(0, num(b?.workAdded)), label: bucketLabel(b, i, list.length) }));
+    S.settleError = false;
+  } catch (err) {
+    S.settleError = true;
+    if (S.demo && !S.buckets.length) S.buckets = demoBuckets();
+  }
+  renderChart();
+}
+function bucketLabel(b, i, n) {
+  const t = parseTime(b?.start ?? b?.bucketStart ?? b?.from ?? b?.timestamp ?? b?.time);
+  if (t) return new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return i === n - 1 ? "Latest bucket" : (n - 1 - i) + " buckets before the latest";
+}
+
+/* ---- Offline demo: synthetic wheel while the API is unreachable ---- */
+const demo = { start: Date.now(), work: 2048, dist: 1234567890 };
+function demoTick() {
+  const first = !S.demo;
+  S.demo = true; S.conn = "demo";
+  const t = (Date.now() - demo.start) / 1000;
+  const spinning = t % 150 < 110;                       // run 110s, nap 40s
+  const rpm = spinning ? 40 + 14 * Math.sin(t / 9) : 0;
+  if (spinning && !first) demo.work += Math.random() < 0.7 ? 1 + Math.floor(Math.random() * 3) : 0;
+  demo.dist += (rpm / 60) * 5 * 600;                    // revs in 5 s x ~600 mm circumference
+  applyStatus({
+    spinning, rpm, work: demo.work, distMm: demo.dist, observedAt: Date.now(), staleAfter: 120,
+    height: 1140 + Math.floor(t / 90), progress: (t % 90) / 90,
+  }, first);
+  if (first && !S.buckets.length) { S.buckets = demoBuckets(); renderChart(); }
+}
+function demoBuckets() {
+  const r = mulberry32(7);
+  return Array.from({ length: 24 }, (_, i) => ({ work: Math.round(20 + 120 * Math.abs(Math.sin(i / 4)) * r()), label: (24 - i) + " h ago" }));
+}
+
+/* ================= Audio engine ================= */
+const Engine = {
+  ctx: null, step: 0, nextTime: 0, bpm: 70, nextBell: 0, ambSince: 0, lastAmb: null, timer: 0, bar: 0,
+  songHeight: -1, lastF: 0, lastDelay: 0,
+
+  init() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+    this.ctx = ctx;
+    const g = (v, to) => { const n = ctx.createGain(); n.gain.value = v; if (to) n.connect(to); return n; };
+
+    // master gain 0.5 -> lowpass -> compressor -> analyser -> volume -> out
+    this.out = g(S.muted ? 0 : S.volume, ctx.destination);
+    this.analyser = ctx.createAnalyser();
+    this.analyser.fftSize = 256;
+    this.analyser.smoothingTimeConstant = 0.82;
+    this.analyser.connect(this.out);
+    this.comp = ctx.createDynamicsCompressor();
+    this.comp.threshold.value = -18; this.comp.ratio.value = 4;
+    this.comp.attack.value = 0.01; this.comp.release.value = 0.25;
+    this.comp.connect(this.analyser);
+    this.lp = ctx.createBiquadFilter();
+    this.lp.type = "lowpass"; this.lp.frequency.value = 900; this.lp.Q.value = 0.7;
+    this.lp.connect(this.comp);
+    this.master = g(0.5, this.lp);
+
+    // light feedback delay
+    this.delay = ctx.createDelay(2);
+    this.delay.delayTime.value = 0.375;
+    this.fb = g(0.32);
+    this.delayTone = ctx.createBiquadFilter();
+    this.delayTone.type = "lowpass"; this.delayTone.frequency.value = 2400;
+    this.send = g(0.22, this.delay);
+    this.delay.connect(this.delayTone); this.delayTone.connect(this.fb); this.fb.connect(this.delay);
+    this.delayTone.connect(this.master);
+
+    // buses (drums and melody fade out when the hamster sleeps)
+    this.drums = g(0, this.master);
+    this.bass = g(0, this.master);
+    this.melody = g(0, this.master); this.melody.connect(this.send);
+    this.pad = g(0.9, this.master); this.pad.connect(this.send);
+    this.amb = g(0, this.master); this.amb.connect(this.send);
+    this.fx = g(1, this.master);
+
+    // 2s white noise buffer shared by hats, wind and riser
+    const len = ctx.sampleRate * 2;
+    this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = this.noise.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.startWind();
+
+    this.bpm = targetBpm();
+    this.nextTime = ctx.currentTime + 0.1;
+    this.nextBell = ctx.currentTime + 2;
+    this.timer = setInterval(() => this.schedule(), TICK_MS);
+  },
+
+  // Fade a param linearly from its current value
+  ramp(param, v, secs) {
+    const t = this.ctx.currentTime;
+    param.cancelScheduledValues(t);
+    param.setValueAtTime(param.value, t);
+    param.linearRampToValueAtTime(v, t + secs);
+  },
+
+  // Keep buses, filter and delay in line with the wheel
+  mix() {
+    const ctx = this.ctx, amb = isAmbient();
+    if (amb !== this.lastAmb) {
+      const fade = this.lastAmb === null ? 0.5 : 4;
+      this.ramp(this.drums.gain, amb ? 0 : 1, fade);
+      this.ramp(this.melody.gain, amb ? 0 : 1, fade);
+      this.ramp(this.bass.gain, amb ? 0 : 1, fade);
+      this.ramp(this.amb.gain, amb ? 1 : 0, fade);
+      this.ambSince = ctx.currentTime;
+      this.lastAmb = amb;
+    }
+    // lowpass 800..4000 Hz by rpm; only re-target when the value really moves
+    const f = amb ? 900 : 800 + clamp(S.rpm / 60, 0, 1) * 3200;
+    if (Math.abs(f - this.lastF) > 20) { this.lp.frequency.setTargetAtTime(f, ctx.currentTime, 0.6); this.lastF = f; }
+    const dt = clamp((60 / this.bpm) * 0.75, 0.05, 1.5);   // dotted-eighth echo
+    if (Math.abs(dt - this.lastDelay) > 0.01) { this.delay.delayTime.setTargetAtTime(dt, ctx.currentTime, 0.5); this.lastDelay = dt; }
+  },
+
+  // Lookahead scheduler, 16th-note grid
+  schedule() {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== "running") return;
+    this.mix();
+    // Background tabs throttle timers to ~1s, so look further ahead there
+    const ahead = document.hidden ? 1.5 : LOOKAHEAD_S;
+    if (this.nextTime < ctx.currentTime) this.nextTime = ctx.currentTime + 0.05;
+    while (this.nextTime < ctx.currentTime + ahead) {
+      if (this.step % 16 === 0 && S.song.height !== this.songHeight) { this.songHeight = S.song.height; this.step = 0; }
+      this.playStep(this.step, this.nextTime);
+      this.bpm += (targetBpm() - this.bpm) * 0.08;     // smoothed tempo
+      this.nextTime += 60 / this.bpm / 4;
+      this.step = (this.step + 1) % 64;
+    }
+    if (isAmbient()) {
+      if (this.nextBell < ctx.currentTime) this.nextBell = ctx.currentTime + 0.05;
+      if (this.nextBell < ctx.currentTime + ahead) { this.bell(this.nextBell); this.nextBell += 6 + Math.random() * 4; }
+    }
+  },
+
+  playStep(step, t) {
+    const s = step % 16, barIdx = Math.floor(step / 16);
+    const sixteenth = 60 / this.bpm / 4, barLen = sixteenth * 16;
+    const amb = isAmbient();
+    const mood = moodKey();
+    const song = S.song;
+
+    if (s === 0) {
+      const name = amb ? (Math.floor(this.bar / 2) % 2 === 0 ? "Am9" : "Fmaj7") : song.prog[barIdx];
+      this.padChord(CHORDS[name], t, barLen, amb);
+      this.bar++;
+      setTimeout(() => { S.chord = name; renderLcd(); }, Math.max(0, (t - this.ctx.currentTime) * 1000));
+    }
+
+    // Skip drum/melody voices once their buses have faded out
+    if (amb && this.ctx.currentTime > this.ambSince + 4.2) return;
+    const root = CHORDS[song.prog[barIdx]];
+    const level = mood === "nap" ? 0.6 : 1;
+
+    // kick
+    const kicks = mood === "storm" ? [0, 4, 8, 11, 12] : mood === "journey" ? [0, 8, 11] : [0, 8];
+    if (kicks.includes(s)) this.kick(t, level);
+    // off-beat hi-hat (+ ghost 16ths in Storm)
+    if (s % 4 === 2) this.hat(t, 0.16 * level);
+    else if (mood === "storm" && s % 2 === 1) this.hat(t, 0.05);
+    // bass on the chord root
+    if (mood === "storm") {
+      if (s % 2 === 0) this.bassNote(root[0] - 12 + (s % 4 === 2 ? 12 : 0), t, sixteenth * 1.6, true);
+    } else if (s === 0 || s === 8 || (mood === "journey" && s === 14)) {
+      this.bassNote(root[0] - 12, t, sixteenth * (s === 14 ? 1.5 : 5), false);
+    }
+    // melody, by mood density
+    const density = MOODS[mood].density;
+    if (density > 0 && song.rolls[step] < density) this.pluck(song.notes[step], t, 0.2);
+    // octave arpeggio in Storm
+    if (mood === "storm") {
+      const arp = [root[0] + 12, root[1] + 12, root[2] + 12, root[0] + 24];
+      this.pluck(arp[s % 4], t, 0.07);
+    }
+  },
+
+  // Generic oscillator voice with ADSR; nodes disconnect when finished
+  voice(type, freq, t, a, d, sus, hold, r, peak, dest, detune) {
+    const ctx = this.ctx;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    if (detune) o.detune.value = detune;
+    const end = t + Math.max(a + d, hold);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(peak, t + a);
+    g.gain.linearRampToValueAtTime(peak * sus, t + a + d);
+    g.gain.setValueAtTime(peak * sus, end);
+    g.gain.linearRampToValueAtTime(0, end + r);
+    o.connect(g); g.connect(dest);
+    o.start(t); o.stop(end + r + 0.02);
+    o.onended = () => { o.disconnect(); g.disconnect(); };
+    return o;
+  },
+
+  kick(t, level) {
+    const o = this.voice("sine", 150, t, 0.002, 0.22, 0, 0, 0.05, 0.9 * level, this.drums);
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+  },
+
+  noiseVoice(t, dur, peak, filterType, freq, dest) {
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    src.buffer = this.noise;
+    f.type = filterType; f.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(peak, t + 0.002);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(dest);
+    src.start(t, Math.random() * Math.max(0, 1.9 - dur)); src.stop(t + dur + 0.02);
+    src.onended = () => { src.disconnect(); f.disconnect(); g.disconnect(); };
+    return { src, f, g };
+  },
+
+  hat(t, peak) { this.noiseVoice(t, 0.05, peak, "highpass", 7000, this.drums); },
+
+  bassNote(m, t, len, heavy) {
+    this.voice("triangle", midiHz(m), t, 0.01, 0.12, 0.7, len, 0.08, heavy ? 0.42 : 0.34, this.bass);
+    if (heavy) this.voice("sine", midiHz(m - 12), t, 0.01, 0.1, 0.8, len, 0.06, 0.32, this.bass);
+  },
+
+  pluck(m, t, peak) { this.voice("triangle", midiHz(m), t, 0.005, 0.18, 0.18, 0.08, 0.25, peak, this.melody); },
+
+  // Detuned saw pad through its own lowpass
+  padChord(notes, t, len, amb) {
+    const ctx = this.ctx;
+    const f = ctx.createBiquadFilter(), g = ctx.createGain();
+    f.type = "lowpass"; f.frequency.value = amb ? 900 : 1500; f.Q.value = 0.5;
+    g.gain.value = 1;
+    f.connect(g); g.connect(this.pad);
+    const peak = (amb ? 0.07 : 0.055) / Math.sqrt(notes.length);
+    const atk = amb ? 1.6 : 0.6, rel = amb ? 2.2 : 1;
+    let last = null;
+    for (const m of notes) for (const det of [-8, 8]) last = this.voice("sawtooth", midiHz(m), t, atk, 0.4, 0.8, len, rel, peak, f, det);
+    if (last) last.addEventListener("ended", () => { f.disconnect(); g.disconnect(); });
+  },
+
+  // Rare bell: inharmonic sine partials with a long exponential tail
+  bell(t) {
+    const ctx = this.ctx;
+    const m = PENTA[5 + Math.floor(Math.random() * 6)] + 12;
+    [[1, 0.12], [2.76, 0.04], [5.4, 0.018]].forEach(([ratio, peak]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.value = midiHz(m) * ratio;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(peak, t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 3.5 / ratio + 0.5);
+      o.connect(g); g.connect(this.amb);
+      o.start(t); o.stop(t + 4.2);
+      o.onended = () => { o.disconnect(); g.disconnect(); };
+    });
+  },
+
+  // Soft wind: looping noise through a slowly swept bandpass
+  startWind() {
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    const lfo = ctx.createOscillator(), depth = ctx.createGain();
+    src.buffer = this.noise; src.loop = true;
+    f.type = "bandpass"; f.frequency.value = 520; f.Q.value = 0.9;
+    g.gain.value = 0.07;
+    lfo.frequency.value = 0.07; depth.gain.value = 320;
+    lfo.connect(depth); depth.connect(f.frequency);
+    src.connect(f); f.connect(g); g.connect(this.amb);
+    src.start(); lfo.start();
+  },
+
+  // Short 1200 Hz click with random pan for each new work unit
+  clicks(n) {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== "running") return;
+    for (let i = 0; i < n; i++) {
+      const t = ctx.currentTime + 0.02 + i * 0.07;
+      const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      const dest = pan || this.fx;
+      if (pan) { pan.pan.value = Math.random() * 1.6 - 0.8; pan.connect(this.fx); }
+      const o = this.voice("square", 1200, t, 0.001, 0.03, 0, 0, 0.01, 0.07, dest);
+      if (pan) o.addEventListener("ended", () => pan.disconnect());
+    }
+  },
+
+  // 1s noise riser announcing a new block (new song)
+  riser() {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== "running") return;
+    const t = ctx.currentTime + 0.02;
+    const { f, g } = this.noiseVoice(t, 1.05, 0.0001, "bandpass", 300, this.fx);
+    f.Q.value = 3;
+    f.frequency.setValueAtTime(300, t);
+    f.frequency.exponentialRampToValueAtTime(6000, t + 1);
+    g.gain.cancelScheduledValues(t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.95);
+    g.gain.linearRampToValueAtTime(0, t + 1.05);
+  },
+
+  setVolume() {
+    if (!this.ctx) return;
+    this.out.gain.setTargetAtTime(S.muted ? 0 : S.volume, this.ctx.currentTime, 0.05);
+  },
+};
+function targetBpm() { return isAmbient() ? 60 : 70 + clamp(S.rpm / 60, 0, 1) * 58; }
+
+/* ================= UI ================= */
+const el = {
+  body: document.body, needle: $("needle"), statusText: $("statusText"), bpm: $("bpm"), badge: $("badge"),
+  play: $("play"), playIcon: $("playIcon"), hint: $("hint"), wheel: $("wheel"), hamster: $("hamster"),
+  summary: $("summary"), announce: $("announce"), track: $("track"), mood: $("mood"), chord: $("chord"),
+  songPct: $("songPct"), songBar: $("songBar"), songFill: $("songFill"),
+  statWork: $("statWork"), statBlock: $("statBlock"), statKm: $("statKm"),
+  vol: $("vol"), knob: $("knob"), mute: $("mute"), sleep: $("sleep"),
+  chart: $("chart"), chartNote: $("chartNote"), viz: $("viz"),
+};
+const BADGE = { live: "live", stale: "data stale", reconnecting: "reconnecting", demo: "offline demo", connecting: "connecting" };
+let lastAnnounce = "";
+
+function renderLcd() {
+  const amb = isAmbient();
+  el.track.textContent = S.hasData ? "Block " + fmtInt.format(S.height) + " · " + S.song.name : "Tuning in";
+  el.mood.textContent = amb ? (S.sleepMode ? "Sleep mode" : "Sleeping") : MOODS[moodKey()].label;
+  el.chord.textContent = S.playing ? S.chord : amb ? "Am9" : S.song.prog[0];
+  const pct = Math.round(S.progress * 100);
+  el.songPct.textContent = pct + "%";
+  el.songFill.style.width = pct + "%";
+  el.songBar.setAttribute("aria-valuenow", String(pct));
+}
+
+function render() {
+  const running = isRunning(), stale = isStale();
+  const conn = S.demo ? "demo" : stale && S.conn !== "reconnecting" ? "stale" : S.conn;
+  el.body.classList.toggle("is-running", running);
+  el.body.classList.toggle("is-sleeping", !running);
+
+  const rpm = Math.round(S.rpm);
+  el.statusText.textContent = !S.hasData ? "Tuning in to Squeektoshi"
+    : stale ? "Waiting for fresh wheel data"
+    : running ? "Squeektoshi is running · " + rpm + " RPM" : "Squeektoshi is sleeping";
+  const bpm = Math.round(S.playing && Engine.ctx ? Engine.bpm : targetBpm());
+  el.bpm.textContent = bpm + " bpm";
+  el.badge.textContent = BADGE[conn] || conn;
+  el.badge.dataset.state = conn;
+  el.needle.style.left = (4 + clamp((running ? S.rpm : 0) / 60, 0, 1) * 92) + "%";
+
+  el.statWork.textContent = fmtInt.format(S.work);
+  el.statBlock.textContent = fmtInt.format(S.height);
+  el.statKm.textContent = (S.distMm / 1e6).toFixed(2);
+  renderLcd();
+
+  // Hidden heading summarises the station for screen readers
+  const moodLabel = isAmbient() ? "calm ambient" : MOODS[moodKey()].label + " mood";
+  el.summary.textContent = (S.hasData ? (running ? "Squeektoshi is running at " + rpm + " RPM" : "Squeektoshi is sleeping") +
+    ", " + moodLabel + ", block " + fmtInt.format(S.height) : "Connecting to Squeekchain") + ", " + BADGE[conn] + ".";
+  // Announce only meaningful changes, politely
+  const msg = (S.hasData ? (running ? "Squeektoshi is running." : "Squeektoshi is sleeping.") : "") + " Feed " + BADGE[conn] + ".";
+  if (msg !== lastAnnounce) { el.announce.textContent = msg; lastAnnounce = msg; }
+}
+
+function renderChart() {
+  const svg = el.chart;
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const b = S.buckets;
+  if (!b.length) {
+    const txt = S.settleError ? "24 h history is unavailable right now. Retrying every 3 minutes." : "Loading 24 h history";
+    el.chartNote.textContent = txt; svg.setAttribute("aria-label", txt);
+    return;
+  }
+  const W = 240, H = 86, bw = W / b.length;
+  const max = Math.max(1, ...b.map((x) => x.work));
+  let total = 0;
+  b.forEach((x, i) => {
+    total += x.work;
+    const h = Math.max(1, Math.round((x.work / max) * (H - 4)));
+    const r = document.createElementNS(NS, "rect");
+    r.setAttribute("x", (i * bw + bw * 0.12).toFixed(2));
+    r.setAttribute("y", String(H - h));
+    r.setAttribute("width", Math.max(1, bw * 0.76).toFixed(2));
+    r.setAttribute("height", String(h));
+    r.setAttribute("class", i === b.length - 1 ? "b now" : "b");
+    const title = document.createElementNS(NS, "title");
+    title.textContent = x.label + ": " + fmtInt.format(x.work) + " work";
+    r.appendChild(title);
+    svg.appendChild(r);
+  });
+  const base = document.createElementNS(NS, "rect");
+  base.setAttribute("x", "0"); base.setAttribute("y", String(H)); base.setAttribute("width", String(W)); base.setAttribute("height", "2");
+  base.setAttribute("class", "base");
+  svg.appendChild(base);
+  const note = fmtInt.format(total) + " work in 24 h · busiest bucket " + fmtInt.format(max) + (S.demo ? " · demo data" : S.settleError ? " · last saved" : "");
+  el.chartNote.textContent = note;
+  svg.setAttribute("aria-label", "Bar chart of work per bucket over 24 hours. " + note);
+}
+
+/* ---- Pixel art: wheel and hamster built once from small grids ---- */
+function ringPath(r0, r1) {
+  let d = "";
+  for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+    const r = Math.hypot(x + 0.5 - 32, y + 0.5 - 32);
+    if (r >= r0 && r < r1) d += "M" + x + " " + y + "h1v1h-1z";
+  }
+  return d;
+}
+function buildWheel() {
+  $("wRim").setAttribute("d", ringPath(29, 31.6));
+  $("wRim2").setAttribute("d", ringPath(26.4, 27.6));
+  $("wHub").setAttribute("d", ringPath(0, 3.2));
+  let rungs = "", spokes = "";
+  const seen = new Set();
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    const x = Math.round(32 + Math.cos(a) * 28.2 - 1), y = Math.round(32 + Math.sin(a) * 28.2 - 1);
+    rungs += "M" + x + " " + y + "h2v2h-2z";
+  }
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + 0.26;
+    for (let r = 3; r < 26.5; r += 0.5) {
+      const x = Math.floor(32 + Math.cos(a) * r), y = Math.floor(32 + Math.sin(a) * r), k = x + "," + y;
+      if (!seen.has(k)) { seen.add(k); spokes += "M" + x + " " + y + "h1v1h-1z"; }
+    }
+  }
+  $("wRungs").setAttribute("d", rungs);
+  $("wSpokes").setAttribute("d", spokes);
+}
+const HAMSTER = [
+  "........oo....",
+  ".....oooCCo...",
+  "...ooCCCCCCo..",
+  "..oCCCCCCCkCo.",
+  ".oCCCCCCCCCCpo",
+  "oCCCCCccccCCo.",
+  ".oCCCccccccoo.",
+  "..oooooooooo..",
+];
+const LEGS = ["...o.o...o.o..", "....o.o.o.o..."];
+const HCOL = { o: "#7A3E12", C: "#FF9F43", c: "#F6E7C1", k: "#0F1020", p: "#F28AA0" };
+function gridToSvg(rows, y0, parent) {
+  for (let y = 0; y < rows.length; y++) for (let x = 0; x < rows[y].length; x++) {
+    const ch = rows[y][x];
+    if (!HCOL[ch]) continue;
+    const r = document.createElementNS(NS, "rect");
+    r.setAttribute("x", String(x)); r.setAttribute("y", String(y + y0));
+    r.setAttribute("width", "1"); r.setAttribute("height", "1"); r.setAttribute("fill", HCOL[ch]);
+    parent.appendChild(r);
+  }
+}
+const legFrames = [];
+function buildHamster() {
+  const body = document.createElementNS(NS, "g");
+  gridToSvg(HAMSTER, 0, body);
+  el.hamster.appendChild(body);
+  LEGS.forEach((row, i) => {
+    const g = document.createElementNS(NS, "g");
+    gridToSvg([row], 8, g);
+    g.style.display = i === 0 ? "" : "none";
+    el.hamster.appendChild(g);
+    legFrames.push(g);
+  });
+}
+function buildSky() {
+  const sky = $("sky"), r = mulberry32(42);
+  for (let i = 0; i < 48; i++) {
+    const s = document.createElement("i");
+    s.style.left = (r() * 100).toFixed(2) + "%";
+    s.style.top = (r() * 100).toFixed(2) + "%";
+    sky.appendChild(s);
+  }
+}
+
+/* ---- Animation loop: wheel rotation, hamster legs, visualizer ---- */
+let angle = 0, lastFrame = performance.now(), legT = 0, legIdx = 0, bins = null;
+function frame(now) {
+  const dt = Math.min(0.1, (now - lastFrame) / 1000);
+  lastFrame = now;
+  const running = isRunning();
+  if (running && !reducedMotion.matches) {
+    angle = (angle + S.rpm * 6 * dt) % 360;               // rpm -> degrees per second
+    el.wheel.style.transform = "rotate(" + angle.toFixed(2) + "deg)";
+    legT += dt;
+    const stepEvery = clamp(9 / Math.max(S.rpm, 1), 0.08, 0.3);
+    if (legT > stepEvery) { legT = 0; legIdx ^= 1; legFrames.forEach((g, i) => { g.style.display = i === legIdx ? "" : "none"; }); }
+  }
+  drawViz();
+  requestAnimationFrame(frame);
+}
+
+// Mirrored gold-to-amber bars with soft glow
+function sizeCanvas() {
+  const c = el.viz, dpr = Math.min(2, window.devicePixelRatio || 1);
+  c.width = Math.round(c.clientWidth * dpr);
+  c.height = Math.round(c.clientHeight * dpr);
+}
+const vizCtx = el.viz.getContext("2d");
+function drawViz() {
+  const c = el.viz, g = vizCtx;
+  if (!g || !c.width) return;
+  const w = c.width, h = c.height, mid = h / 2;
+  g.clearRect(0, 0, w, h);
+  const unit = Math.max(2, Math.round(w / 120));          // pixel block size
+  const barW = unit * 2, gap = unit, count = Math.floor(w / 2 / (barW + gap));
+  let data = null;
+  if (Engine.analyser && S.playing) {
+    if (!bins) bins = new Uint8Array(Engine.analyser.frequencyBinCount);
+    Engine.analyser.getByteFrequencyData(bins);
+    data = bins;
+  }
+  const grad = g.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "#FF9F43"); grad.addColorStop(0.5, "#F2C14E"); grad.addColorStop(1, "#FF9F43");
+  g.fillStyle = grad;
+  g.shadowColor = "rgba(255, 159, 67, 0.6)";
+  g.shadowBlur = unit * 3;
+  for (let i = 0; i < count; i++) {
+    const v = data ? data[Math.min(data.length - 1, Math.floor(i * 1.6) + 1)] / 255 : 0;
+    const half = Math.max(unit, Math.round((v * v * (mid - unit)) / unit) * unit);
+    const xr = w / 2 + gap / 2 + i * (barW + gap), xl = w / 2 - gap / 2 - (i + 1) * (barW + gap) + gap;
+    g.fillRect(xr, mid - half, barW, half * 2);
+    g.fillRect(xl, mid - half, barW, half * 2);
+  }
+}
+
+/* ---- Controls ---- */
+const ICON_PLAY = "M5 3h2v10H5zM7 4h2v8H7zM9 5h2v6H9zM11 6h2v4h-2zM13 7h1v2h-1z";
+const ICON_PAUSE = "M4 3h3v10H4zM9 3h3v10H9z";
+async function togglePlay() {
+  try {
+    if (!Engine.ctx) Engine.init();                         // AudioContext only after a user gesture
+    if (S.playing) { await Engine.ctx.suspend(); S.playing = false; }
+    else { await Engine.ctx.resume(); S.playing = true; }
+  } catch (err) {
+    el.hint.textContent = "This browser blocked audio. Check that sound is allowed for this page, then press play again.";
+    S.playing = false;
+  }
+  el.play.setAttribute("aria-label", S.playing ? "Pause Wheel Radio" : "Play Wheel Radio");
+  el.playIcon.setAttribute("d", S.playing ? ICON_PAUSE : ICON_PLAY);
+  if (S.playing) el.hint.textContent = "On air. Music changes as the wheel speeds up, slows down or sleeps.";
+  else if (Engine.ctx && Engine.ctx.state === "suspended") el.hint.textContent = "Paused. Press play to tune back in.";
+  render();
+}
+el.play.addEventListener("click", togglePlay);
+
+function setVolume() {
+  S.volume = Number(el.vol.value) / 100;
+  el.knob.style.setProperty("--v", String(S.volume));
+  el.vol.setAttribute("aria-valuetext", el.vol.value + " percent");
+  Engine.setVolume();
+}
+el.vol.addEventListener("input", setVolume);
+el.mute.addEventListener("click", () => {
+  S.muted = !S.muted;
+  el.mute.textContent = S.muted ? "Unmute" : "Mute";
+  Engine.setVolume();
+});
+el.sleep.addEventListener("click", () => {
+  S.sleepMode = !S.sleepMode;
+  el.sleep.setAttribute("aria-pressed", String(S.sleepMode));
+  render();
+});
+
+/* ---- Boot ---- */
+buildSky();
+buildWheel();
+buildHamster();
+sizeCanvas();
+setVolume();
+addEventListener("resize", sizeCanvas);
+render();
+renderChart();
+requestAnimationFrame(frame);
+setInterval(render, 1000);                                 // stale detection and BPM readout
+pollStatus().then(() => pollSettlements());
+setInterval(pollSettlements, SETTLE_EVERY_MS);
+</script>
+</body>
+</html>
