@@ -95,7 +95,7 @@ a { color: var(--accent); text-underline-offset: 3px; }
 }
 
 /* ---------- Twinkling stars (decorative) ---------- */
-.sky { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.sky { position: fixed; inset: 0; overflow: clip; pointer-events: none; z-index: 0; }
 .sky i {
   position: absolute; width: 2px; height: 2px; background: var(--cream); opacity: 0.5;
 }
@@ -194,7 +194,7 @@ a { color: var(--accent); text-underline-offset: 3px; }
 
 /* 3. Wheel stage with play button */
 .stage-wrap { display: grid; justify-items: center; gap: var(--space-3); }
-.stage { position: relative; width: min(264px, 100%); aspect-ratio: 1; }
+.stage { position: relative; width: min(264px, 100%); aspect-ratio: 1; overflow: clip; }
 .wheel { position: absolute; inset: 0; width: 100%; height: 100%; will-change: transform; }
 .wheel .rim { fill: var(--accent); transition: fill var(--t); }
 .wheel .rim2 { fill: #8A5A1C; }
@@ -554,20 +554,18 @@ const isStale = () => !S.demo && S.observedAt > 0 && Date.now() - S.observedAt >
 const isRunning = () => S.hasData && S.spinning && !isStale();
 const isAmbient = () => S.sleepMode || !isRunning();
 
-// Work gained over the last 10 minutes from our own samples,
-// topped up from the 24h buckets until we have 10 minutes of history.
+// Use observed cumulative-work deltas only; warm-up covers the history we have.
 function workGained() {
   const log = S.workLog;
   if (!log.length) return 0;
   const now = log[log.length - 1];
-  const base = log.find((e) => e.t >= now.t - WORK_WINDOW_MS) || log[0];
-  let gained = Math.max(0, now.w - base.w);
-  if (now.t - base.t < WORK_WINDOW_MS * 0.9 && S.buckets.length > 1) {
-    const spanMs = (24 * 3600 * 1000) / S.buckets.length;
-    const ref = S.buckets[S.buckets.length - 2].work;
-    gained = Math.max(gained, Math.round(ref * WORK_WINDOW_MS / spanMs));
+  const cutoff = Date.now() - WORK_WINDOW_MS;
+  let base = log[0];
+  for (const sample of log) {
+    if (sample.t > cutoff) break;
+    base = sample; // retain the sample at or immediately before the boundary
   }
-  return gained;
+  return Math.max(0, now.w - base.w);
 }
 function moodKey() {
   const g = workGained();
@@ -609,7 +607,8 @@ function applyStatus(next, first) {
   S.hasData = true;
   const now = Date.now();
   S.workLog.push({ t: now, w: next.work });
-  while (S.workLog.length && S.workLog[0].t < now - WORK_WINDOW_MS - 60000) S.workLog.shift();
+  // Keep one boundary sample, even when polling resumes after a long gap.
+  while (S.workLog.length > 1 && S.workLog[1].t <= now - WORK_WINDOW_MS) S.workLog.shift();
   if (!first && next.work > prevWork) Engine.clicks(Math.min(4, Math.ceil(next.work - prevWork)));
   if (first || next.height !== prevHeight) {
     S.song = makeSong(next.height);
@@ -674,7 +673,7 @@ function demoBuckets() {
 /* ================= Audio engine ================= */
 const Engine = {
   ctx: null, step: 0, nextTime: 0, bpm: 70, nextBell: 0, ambSince: 0, lastAmb: null, timer: 0, bar: 0,
-  songHeight: -1, lastF: 0, lastDelay: 0,
+  songHeight: -1, lastF: 0, lastDelay: 0, lastRhythm: null,
 
   init() {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -739,14 +738,16 @@ const Engine = {
   // Keep buses, filter and delay in line with the wheel
   mix() {
     const ctx = this.ctx, amb = isAmbient();
-    if (amb !== this.lastAmb) {
+    const rhythm = !amb && moodKey() !== "nap";
+    if (amb !== this.lastAmb || rhythm !== this.lastRhythm) {
       const fade = this.lastAmb === null ? 0.5 : 4;
-      this.ramp(this.drums.gain, amb ? 0 : 1, fade);
-      this.ramp(this.melody.gain, amb ? 0 : 1, fade);
-      this.ramp(this.bass.gain, amb ? 0 : 1, fade);
+      this.ramp(this.drums.gain, rhythm ? 1 : 0, fade);
+      this.ramp(this.melody.gain, rhythm ? 1 : 0, fade);
+      this.ramp(this.bass.gain, rhythm ? 1 : 0, fade);
       this.ramp(this.amb.gain, amb ? 1 : 0, fade);
       this.ambSince = ctx.currentTime;
       this.lastAmb = amb;
+      this.lastRhythm = rhythm;
     }
     // lowpass 800..4000 Hz by rpm; only re-target when the value really moves
     const f = amb ? 900 : 800 + clamp(S.rpm / 60, 0, 1) * 3200;
@@ -790,6 +791,8 @@ const Engine = {
       setTimeout(() => { S.chord = name; renderLcd(); }, Math.max(0, (t - this.ctx.currentTime) * 1000));
     }
 
+    // Nap is chords only; other moods preserve the existing ambient fade.
+    if (mood === "nap") return;
     // Skip drum/melody voices once their buses have faded out
     if (amb && this.ctx.currentTime > this.ambSince + 4.2) return;
     const root = CHORDS[song.prog[barIdx]];
@@ -971,6 +974,7 @@ function renderLcd() {
 function render() {
   const running = isRunning(), stale = isStale();
   const conn = S.demo ? "demo" : stale && S.conn !== "reconnecting" ? "stale" : S.conn;
+  const feedLabel = stale && conn === "reconnecting" ? "data stale · reconnecting" : BADGE[conn];
   el.body.classList.toggle("is-running", running);
   el.body.classList.toggle("is-sleeping", !running);
 
@@ -980,7 +984,7 @@ function render() {
     : running ? "Squeektoshi is running · " + rpm + " RPM" : "Squeektoshi is sleeping";
   const bpm = Math.round(S.playing && Engine.ctx ? Engine.bpm : targetBpm());
   el.bpm.textContent = bpm + " bpm";
-  el.badge.textContent = BADGE[conn] || conn;
+  el.badge.textContent = feedLabel || conn;
   el.badge.dataset.state = conn;
   el.needle.style.left = (4 + clamp((running ? S.rpm : 0) / 60, 0, 1) * 92) + "%";
 
@@ -992,9 +996,9 @@ function render() {
   // Hidden heading summarises the station for screen readers
   const moodLabel = isAmbient() ? "calm ambient" : MOODS[moodKey()].label + " mood";
   el.summary.textContent = (S.hasData ? (running ? "Squeektoshi is running at " + rpm + " RPM" : "Squeektoshi is sleeping") +
-    ", " + moodLabel + ", block " + fmtInt.format(S.height) : "Connecting to Squeekchain") + ", " + BADGE[conn] + ".";
+    ", " + moodLabel + ", block " + fmtInt.format(S.height) : "Connecting to Squeekchain") + ", " + feedLabel + ".";
   // Announce only meaningful changes, politely
-  const msg = (S.hasData ? (running ? "Squeektoshi is running." : "Squeektoshi is sleeping.") : "") + " Feed " + BADGE[conn] + ".";
+  const msg = (S.hasData ? (running ? "Squeektoshi is running." : "Squeektoshi is sleeping.") : "") + " Feed " + feedLabel + ".";
   if (msg !== lastAnnounce) { el.announce.textContent = msg; lastAnnounce = msg; }
 }
 
@@ -1008,11 +1012,12 @@ function renderChart() {
     return;
   }
   const W = 240, H = 86, bw = W / b.length;
-  const max = Math.max(1, ...b.map((x) => x.work));
+  const max = Math.max(0, ...b.map((x) => x.work));
+  const scaleMax = Math.max(1, max);
   let total = 0;
   b.forEach((x, i) => {
     total += x.work;
-    const h = Math.max(1, Math.round((x.work / max) * (H - 4)));
+    const h = x.work === 0 ? 0 : Math.max(1, Math.round((x.work / scaleMax) * (H - 4)));
     const r = document.createElementNS(NS, "rect");
     r.setAttribute("x", (i * bw + bw * 0.12).toFixed(2));
     r.setAttribute("y", String(H - h));
@@ -1163,18 +1168,22 @@ function drawViz() {
 const ICON_PLAY = "M5 3h2v10H5zM7 4h2v8H7zM9 5h2v6H9zM11 6h2v4h-2zM13 7h1v2h-1z";
 const ICON_PAUSE = "M4 3h3v10H4zM9 3h3v10H9z";
 async function togglePlay() {
+  let failed = false;
   try {
     if (!Engine.ctx) Engine.init();                         // AudioContext only after a user gesture
     if (S.playing) { await Engine.ctx.suspend(); S.playing = false; }
     else { await Engine.ctx.resume(); S.playing = true; }
   } catch (err) {
+    failed = true;
     el.hint.textContent = "This browser blocked audio. Check that sound is allowed for this page, then press play again.";
     S.playing = false;
   }
   el.play.setAttribute("aria-label", S.playing ? "Pause Wheel Radio" : "Play Wheel Radio");
   el.playIcon.setAttribute("d", S.playing ? ICON_PAUSE : ICON_PLAY);
-  if (S.playing) el.hint.textContent = "On air. Music changes as the wheel speeds up, slows down or sleeps.";
-  else if (Engine.ctx && Engine.ctx.state === "suspended") el.hint.textContent = "Paused. Press play to tune back in.";
+  if (!failed) {
+    if (S.playing) el.hint.textContent = "On air. Music changes as the wheel speeds up, slows down or sleeps.";
+    else if (Engine.ctx && Engine.ctx.state === "suspended") el.hint.textContent = "Paused. Press play to tune back in.";
+  }
   render();
 }
 el.play.addEventListener("click", togglePlay);

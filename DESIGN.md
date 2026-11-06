@@ -33,7 +33,7 @@ source file. `dist/index.html` is a byte copy of it.
 | `--sky` | `#0F1020`, or `#0A0E22` when sleeping | body background color |
 
 Exactly one control is filled: the gold Play button. The badge states pair color with text
-(`live`, `data stale`, `reconnecting`, `offline demo`, `connecting`) and with a filled or hollow
+(`live`, `data stale`, `reconnecting`, `data stale · reconnecting`, `offline demo`, `connecting`) and with a filled or hollow
 square marker, so color is never the only signal.
 
 ## Typography
@@ -47,6 +47,9 @@ square marker, so color is never the only signal.
 The brief names Press Start 2P and VT323. Sentences use a system sans so that no prose line is set
 in a monospace face. The fonts load from Google Fonts (`display=swap`); if that fails, the monospace
 fallbacks render.
+
+The revision's Chromium screenshots use those fallbacks: Google Fonts returned
+`net::ERR_EMPTY_RESPONSE`. The intended font faces were not verified in the browser.
 
 The type scale has four sizes, all weight 400:
 
@@ -86,6 +89,9 @@ is the only uppercase text, and it sits in the header.
    hub) generated on a 64×64 grid, with a 14×9 pixel hamster, a CSS crescent moon and "zzz" while
    sleeping. The round gold **Play/Pause** button (38% of the stage, at least 88px) is centered and
    swaps a pixel play or pause icon and its `aria-label`. A hint line sits under the stage.
+   `.stage` and `.sky` use `overflow: clip` to contain rotating SVG bounds and decorative stars.
+   The Play button and its focus ring fit inside this boundary at the existing size and position.
+   A failed Play keeps its blocked-audio recovery hint; a successful pause shows the paused hint.
 4. **Speaker grille** (`.grille`): dotted grille background with a 96px canvas. It draws mirrored
    pixel bars from the AnalyserNode with an amber-gold-amber gradient and a soft glow.
 5. **Now playing LCD** (`.lcd`): track "Block 1,140 · Night Shift" (seeded word lists), mood, chord,
@@ -98,6 +104,8 @@ is the only uppercase text, and it sits in the header.
 8. **Chart**: inline SVG bars for the 24h buckets (current bucket in amber, each bar with a
    `<title>`), axis labels "24 h ago" and "now", and a summary line, also used as the SVG
    `aria-label`.
+   Zero-work buckets have zero-height data bars and a zero maximum in the summary; the baseline
+   remains visible. Positive values retain their proportional scaling and one-pixel minimum.
 9. **Footer** (`.foot`): squeekchain.com link and "Read-only · no wallet · near real-time · community
    project".
 
@@ -111,7 +119,9 @@ are a 3px cream outline (8px offset on Play). Forced-colors mode adds system-col
   480px` and centered, so at 1440px it stays a 480px radio on the starry background.
 - Inner card padding is 16px below 400px, 24px from 400px up, and 12px at 360px or less.
 - At 390×844 the first screen shows the brand, dial, status and the whole wheel with the Play button.
-  This is computed from the CSS sizes, not checked on a screenshot (see `artifacts/validation.md`).
+  This was inspected in a Chromium screenshot, including a visible keyboard focus ring
+  (see `artifacts/validation.md`). Reflow was measured at 320, 390 and 1440px, including 24 wheel
+  angles at each width; none produced horizontal scrolling. Native zoom was not tested.
 - The stage width is `min(264px, 100%)`. The controls row wraps: volume takes at least 180px, then
   Mute and Sleep mode wrap below. Stat values may break anywhere instead of overflowing.
 - The canvas is resized to its CSS width × devicePixelRatio (capped at 2) on window resize.
